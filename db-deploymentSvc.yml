@@ -44,13 +44,13 @@ spec:
               valueFrom :
                 secretKeyRef :
                   name : mysql-secrets
-                  key :  password
+                  key : password
 
             - name: MYSQL_DATABASE # Setting Database Name from a 'ConfigMap'
               valueFrom :
                 configMapKeyRef :
                   name : db-config
-                  key :  dbName
+                  key : dbName
 
 
           ports:

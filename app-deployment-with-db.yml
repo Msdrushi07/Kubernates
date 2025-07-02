@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: springboot-crud-k8s
-          image: springboot-crud-k8s:1.0
+          image: spring-boot-db:1.0   # name of image which is created using docker
           ports:
             - containerPort: 8080
           env:   # Setting Enviornmental Variables
@@ -22,25 +22,25 @@ spec:
               valueFrom :
                 configMapKeyRef :
                   name : db-config
-                  key :  host
+                  key : host
 
             - name: DB_NAME  # Setting Database name from configMap
               valueFrom :
                 configMapKeyRef :
                   name : db-config
-                  key :  dbName
+                  key : dbName
 
             - name: DB_USERNAME  # Setting Database username from Secret
               valueFrom :
                 secretKeyRef :
                   name : mysql-secrets
-                  key :  username
+                  key : username
 
             - name: DB_PASSWORD # Setting Database password from Secret
               valueFrom :
                 secretKeyRef :
                   name : mysql-secrets
-                  key :  password
+                  key : password
 
 ---
 
