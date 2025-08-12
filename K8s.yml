@@ -30,6 +30,6 @@ spec:
   selector:
     app: spring-boot-pod       # Must match Pod template label
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 8080    # port where service is exposed can be different 80
+      targetPort: 8080  #should match port with application.properties server.port
       nodePort: 30080
