@@ -1,1 +1,35 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-spring-deployment   # Name of the Deployment object
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spring-boot-pod     # Must match Pod template label
+  template:
+    metadata:
+      labels:
+        app: spring-boot-pod   # Must match Service selector
+    spec:
+      containers:
+        - name: spring-container
+          image: your-dockerhub-username/spring-boot-app:latest
+          ports:
+            - containerPort: 8080
 
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-spring-service      # Name of the Service object
+spec:
+  type: NodePort
+  selector:
+    app: spring-boot-pod       # Must match Pod template label
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
