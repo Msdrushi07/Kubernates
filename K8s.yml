@@ -17,7 +17,7 @@ spec:
         - name: spring-container
           image: your-dockerhub-username/spring-boot-app:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 8080   #should match port with application.properties server.port
 
 ---
 # Service
