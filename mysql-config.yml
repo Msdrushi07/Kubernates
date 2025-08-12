@@ -4,3 +4,4 @@ metadata:
   name: mysql-config
 data:
   mysql-database: demo_db
+  mysql-username: demo_user
