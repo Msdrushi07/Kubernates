@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spring-app-service
+  labels:
+    app: spring-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: spring-app
+  ports:
+    - protocol: TCP
+      port: 80            # Port exposed externally
+      targetPort: 8080    # Port your Spring Boot app listens on
+
+
+kubectl get svc and copy ecternal ip
+      http://external IP:8080/get
