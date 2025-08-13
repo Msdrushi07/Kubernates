@@ -33,3 +33,6 @@ spec:
     - port: 8080    # port where service is exposed can be different 80
       targetPort: 8080  #should match port with deployment container-port or application.properties server.port
       nodePort: 30080
+      
+kubectl get nodes -o wide. copy ip address
+      http://node IP:nodePort/get
