@@ -1,0 +1,164 @@
+# ==========================================
+# Helm Chart for Spring Boot + MySQL (AWS EKS)
+# With Persistent Volume and Multi-Env values
+# ==========================================
+
+# =========================
+# values.yaml (default dev)
+# =========================
+mysql:
+  mysqlRootPassword: rootpassword
+  mysqlDatabase: demo_db
+  mysqlUser: demo_user
+  mysqlPassword: demo_pass
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: gp2
+
+app:
+  image: my-springboot-app:latest
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8080
+
+# =========================
+# values-prod.yaml
+# =========================
+mysql:
+  mysqlRootPassword: ProdRootPass123
+  mysqlDatabase: prod_db
+  mysqlUser: prod_user
+  mysqlPassword: ProdUserPass456
+
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: gp3
+
+app:
+  image: my-springboot-app:prod
+  replicas: 3
+  service:
+    type: LoadBalancer
+    port: 80
+
+# =========================
+# templates/mysql-pvc.yaml
+# =========================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mysql.fullname" . }}-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mysql.persistence.size }}
+  storageClassName: {{ .Values.mysql.persistence.storageClass }}
+
+# =========================
+# templates/mysql-deployment.yaml
+# =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mysql.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "mysql.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mysql.fullname" . }}
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.mysql.mysqlRootPassword }}
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.mysqlDatabase }}
+            - name: MYSQL_USER
+              value: {{ .Values.mysql.mysqlUser }}
+            - name: MYSQL_PASSWORD
+              value: {{ .Values.mysql.mysqlPassword }}
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: {{ include "mysql.fullname" . }}-pvc
+
+# =========================
+# templates/mysql-service.yaml
+# =========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mysql.fullname" . }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ include "mysql.fullname" . }}
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+# =========================
+# templates/app-deployment.yaml
+# =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+spec:
+  replicas: {{ .Values.app.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "app.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "app.fullname" . }}
+    spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox
+          command: ['sh', '-c', 'until nc -z {{ include "mysql.fullname" . }} 3306; do echo waiting for mysql; sleep 5; done;']
+      containers:
+        - name: app
+          image: {{ .Values.app.image }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://{{ include "mysql.fullname" . }}:3306/{{ .Values.mysql.mysqlDatabase }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.mysql.mysqlUser }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: {{ .Values.mysql.mysqlPassword }}
+
+# =========================
+# templates/app-service.yaml
+# =========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "app.fullname" . }}
+spec:
+  type: {{ .Values.app.service.type }}
+  selector:
+    app: {{ include "app.fullname" . }}
+  ports:
+    - port: {{ .Values.app.service.port }}
+      targetPort: 8080
