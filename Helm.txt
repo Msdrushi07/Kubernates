@@ -412,4 +412,30 @@ Spring Boot gets DB host/user/password dynamically from ConfigMap & Secret.
 
 No hardcoded credentials in the jar.
 
+1️⃣ Helm Chart Install — Resource Creation Order
 
+When you run:
+
+helm install myapp .
+
+Helm renders all YAML files into one big manifest, then applies it to Kubernetes.
+
+Helm doesn’t “run” things one by one like a script — it submits all manifests in the same request.
+However, Kubernetes knows the object dependencies and ensures certain things exist before others can run.
+
+Here’s what happens:
+
+1. ConfigMap created
+
+
+2. Secret created
+
+
+3. MySQL Deployment + Service created
+
+
+4. Spring Boot Deployment + Service created
+
+
+
+The important part: The Spring Boot Deployment will only schedule pods once the ConfigMap and Secret it references exist (because otherwise the Pod spec validation fails).
