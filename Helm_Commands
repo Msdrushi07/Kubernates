@@ -1,0 +1,104 @@
+# ==============================
+# Helm Commands Cheat Sheet
+# ==============================
+
+# ---------- BASIC ----------
+# Check Helm version
+helm version
+
+# Add a Helm repository
+helm repo add <repo-name> <repo-url>
+# Example:
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
+# Update local repo cache
+helm repo update
+
+# Search charts in a repo
+helm search repo <keyword>
+
+# Install a chart
+helm install <release-name> <chart> [flags]
+# Example:
+helm install myapp bitnami/mysql
+
+# Install with values file
+helm install myapp ./mychart -f values.yaml
+
+# Install with multiple values files (priority: last overrides first)
+helm install myapp ./mychart -f values.yaml -f values-prod.yaml
+
+# Upgrade (or install if not exists)
+helm upgrade --install <release-name> <chart> -f values.yaml
+
+# Uninstall a release
+helm uninstall <release-name>
+
+# List releases
+helm list
+
+# ---------- WORKING WITH CHARTS ----------
+# Create a new chart
+helm create <chart-name>
+
+# Lint a chart for syntax issues
+helm lint ./mychart
+
+# Package a chart into a .tgz file
+helm package ./mychart
+
+# Dependency update (for charts with requirements)
+helm dependency update ./mychart
+
+# Template rendering without installing
+helm template <release-name> ./mychart
+
+# ---------- VALUES MANAGEMENT ----------
+# Show default values for a chart
+helm show values <chart>
+
+# Override a single value via CLI
+helm install myapp ./mychart --set key=value
+
+# Override nested values
+helm install myapp ./mychart --set parent.child=value
+
+# Override multiple values
+helm install myapp ./mychart --set key1=val1,key2=val2
+
+# ---------- DEBUGGING ----------
+# Dry run (see what will be deployed)
+helm install <release-name> ./mychart --dry-run --debug
+
+# Get the manifest (YAMLs) for a release
+helm get manifest <release-name>
+
+# Get the values used by a release
+helm get values <release-name>
+
+# Get all info about a release
+helm status <release-name>
+
+# Rollback to a previous revision
+helm rollback <release-name> <revision-number>
+
+# History of releases
+helm history <release-name>
+
+# ---------- COMMON FLAGS ----------
+# --namespace <ns>       → Specify namespace
+# --create-namespace     → Create namespace if it doesn't exist
+# -f <file>              → Provide values file
+# --set key=value        → Override values from CLI
+# --dry-run              → Simulate install/upgrade
+# --debug                → Show debug logs
+
+# ---------- EXAMPLES ----------
+# Install MySQL from Bitnami with custom root password
+helm install mydb bitnami/mysql --set auth.rootPassword=MyPass123
+
+# Upgrade an app to use prod values
+helm upgrade myapp ./mychart -f values-prod.yaml
+
+# Rollback app to revision 2
+helm rollback myapp 2
