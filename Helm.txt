@@ -1,0 +1,286 @@
+Folder structure
+
+
+
+springboot-app/
+
+├── Chart.yaml
+
+├── values.yaml
+
+├── templates/
+
+│   ├── _helpers.tpl
+
+│   ├── deployment.yaml
+
+│   ├── service.yaml
+
+│   ├── ingress.yaml
+
+│   └── NOTES.txt
+
+└── charts/
+
+└── mysql/
+
+├── Chart.yaml
+
+├── values.yaml
+
+└── templates/
+
+├── _helpers.tpl
+
+├── secret.yaml
+
+├── pvc.yaml
+
+├── deployment.yaml
+
+├── service.yaml
+
+└── NOTES.txt
+
+
+---
+
+springboot-app/Chart.yaml
+
+apiVersion: v2 name: springboot-app description: Spring Boot application packaged with a MySQL subchart
+
+Parent chart version (your own chart's version)
+
+version: 0.1.0
+
+App version (your application version)
+
+appVersion: "1.0.0" type: application
+
+Declare the local subchart dependency. Helm v3 will pull it from ./charts/mysql
+
+and render it before the parent resources.
+
+dependencies:
+
+name: mysql version: 0.1.0 repository: "file://charts/mysql"
+
+
+
+---
+
+springboot-app/values.yaml
+
+Default values for the parent chart (Spring Boot app) and for the MySQL subchart overrides.
+
+-------------------
+
+Spring Boot app config
+
+-------------------
+
+replicaCount: 1
+
+image: repository: your-dockerhub-username/myapp tag: "1.0.0" pullPolicy: IfNotPresent
+
+containerPort: 8080
+
+service: type: LoadBalancer # or ClusterIP / NodePort port: 80           # external service port to expose the app
+
+resources: {}
+
+limits:
+
+cpu: 500m
+
+memory: 512Mi
+
+requests:
+
+cpu: 100m
+
+memory: 256Mi
+
+nodeSelector: {} tolerations: [] affinity: {}
+
+Optional Ingress
+
+ingress: enabled: false className: "" annotations: {} hosts: - host: example.com paths: - path: / pathType: Prefix tls: []
+
+-------------------
+
+MySQL subchart overrides (keys must match subchart values.yaml)
+
+-------------------
+
+mysql: image: repository: mysql tag: "8.0" pullPolicy: IfNotPresent
+
+service: port: 3306
+
+App DB credentials (DO NOT commit real passwords; override via --set or a separate values file)
+
+mysqlRootPassword: "change-me-root" mysqlDatabase: "springbootdb" mysqlUser: "appuser" mysqlPassword: "change-me-app"
+
+persistence: enabled: true size: 8Gi storageClass: "" # leave empty to use cluster default
+
+
+---
+
+springboot-app/templates/_helpers.tpl
+
+{{- define "springboot-app.name" -}} {{ .Chart.Name }} {{- end -}}
+
+{{- define "springboot-app.fullname" -}} {{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}} {{- end -}}
+
+{{- define "springboot-app.labels" -}} app.kubernetes.io/name: {{ include "springboot-app.name" . }} app.kubernetes.io/instance: {{ .Release.Name }} app.kubernetes.io/version: {{ .Chart.AppVersion | quote }} app.kubernetes.io/managed-by: {{ .Release.Service }} {{- end -}}
+
+
+---
+
+springboot-app/templates/deployment.yaml
+
+apiVersion: apps/v1 kind: Deployment metadata: name: {{ include "springboot-app.fullname" . }} labels: {{- include "springboot-app.labels" . | nindent 4 }} spec: replicas: {{ .Values.replicaCount }} selector: matchLabels: app.kubernetes.io/name: {{ include "springboot-app.name" . }} app.kubernetes.io/instance: {{ .Release.Name }} template: metadata: labels: app.kubernetes.io/name: {{ include "springboot-app.name" . }} app.kubernetes.io/instance: {{ .Release.Name }} spec: containers: - name: {{ .Chart.Name }} image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}" imagePullPolicy: {{ .Values.image.pullPolicy }} ports: - containerPort: {{ .Values.containerPort }} env: # Compose JDBC URL from the MySQL service name and DB name overridden in parent values - name: SPRING_DATASOURCE_URL value: "jdbc:mysql://{{ printf "%s-mysql" .Release.Name }}:{{ .Values.mysql.service.port }}/{{ .Values.mysql.mysqlDatabase }}" - name: SPRING_DATASOURCE_USERNAME valueFrom: secretKeyRef: name: {{ printf "%s-mysql-secret" .Release.Name | quote }} key: username - name: SPRING_DATASOURCE_PASSWORD valueFrom: secretKeyRef: name: {{ printf "%s-mysql-secret" .Release.Name | quote }} key: password # Optional: set Hibernate DDL strategy and driver explicitly - name: SPRING_JPA_HIBERNATE_DDL_AUTO value: update - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME value: com.mysql.cj.jdbc.Driver readinessProbe: httpGet: path: /actuator/health port: {{ .Values.containerPort }} initialDelaySeconds: 15 periodSeconds: 5 livenessProbe: httpGet: path: /actuator/health/liveness port: {{ .Values.containerPort }} initialDelaySeconds: 30 periodSeconds: 10 resources: {{- toYaml .Values.resources | nindent 12 }}
+
+
+---
+
+springboot-app/templates/service.yaml
+
+apiVersion: v1 kind: Service metadata: name: {{ include "springboot-app.fullname" . }} labels: {{- include "springboot-app.labels" . | nindent 4 }} spec: type: {{ .Values.service.type }} ports: - port: {{ .Values.service.port }} targetPort: {{ .Values.containerPort }} protocol: TCP name: http selector: app.kubernetes.io/name: {{ include "springboot-app.name" . }} app.kubernetes.io/instance: {{ .Release.Name }}
+
+
+---
+
+springboot-app/templates/ingress.yaml
+
+{{- if .Values.ingress.enabled }} apiVersion: networking.k8s.io/v1 kind: Ingress metadata: name: {{ include "springboot-app.fullname" . }} {{- with .Values.ingress.annotations }} annotations: {{- toYaml . | nindent 4 }} {{- end }} spec: {{- if .Values.ingress.className }} ingressClassName: {{ .Values.ingress.className }} {{- end }} rules: {{- range .Values.ingress.hosts }} - host: {{ .host }} http: paths: {{- range .paths }} - path: {{ .path }} pathType: {{ .pathType }} backend: service: name: {{ include "springboot-app.fullname" $ }} port: number: {{ $.Values.service.port }} {{- end }} {{- end }} {{- if .Values.ingress.tls }} tls: {{- toYaml .Values.ingress.tls | nindent 4 }} {{- end }} {{- end }}
+
+
+---
+
+springboot-app/templates/NOTES.txt
+
+Thank you for installing {{ .Chart.Name }}.
+
+Your application has been deployed.
+
+Get the service details: kubectl get svc {{ include "springboot-app.fullname" . }}
+
+If Service type is LoadBalancer, fetch the external IP: kubectl get svc {{ include "springboot-app.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+
+Test the application: curl http://<EXTERNAL-IP>/
+
+
+---
+
+charts/mysql/Chart.yaml
+
+apiVersion: v2 name: mysql description: Simple MySQL subchart for development/demo version: 0.1.0 appVersion: "8.0" type: application
+
+
+---
+
+charts/mysql/values.yaml
+
+image: repository: mysql tag: "8.0" pullPolicy: IfNotPresent
+
+service: port: 3306
+
+mysqlRootPassword: "change-me-root" mysqlDatabase: "springbootdb" mysqlUser: "appuser" mysqlPassword: "change-me-app"
+
+persistence: enabled: true size: 8Gi storageClass: ""  # empty uses cluster default
+
+resources: {}
+
+limits:
+
+cpu: 500m
+
+memory: 1Gi
+
+requests:
+
+cpu: 100m
+
+memory: 256Mi
+
+
+---
+
+charts/mysql/templates/_helpers.tpl
+
+{{- define "mysql.fullname" -}} {{- printf "%s-mysql" .Release.Name | trunc 63 | trimSuffix "-" -}} {{- end -}}
+
+{{- define "mysql.labels" -}} app.kubernetes.io/name: mysql app.kubernetes.io/instance: {{ .Release.Name }} app.kubernetes.io/version: {{ .Chart.AppVersion | quote }} app.kubernetes.io/managed-by: {{ .Release.Service }} {{- end -}}
+
+
+---
+
+charts/mysql/templates/secret.yaml
+
+apiVersion: v1 kind: Secret metadata: name: {{ printf "%s-mysql-secret" .Release.Name | quote }} labels: {{- include "mysql.labels" . | nindent 4 }} type: Opaque stringData: root-password: {{ .Values.mysqlRootPassword | quote }} username: {{ .Values.mysqlUser | quote }} password: {{ .Values.mysqlPassword | quote }}
+
+
+---
+
+charts/mysql/templates/pvc.yaml
+
+{{- if .Values.persistence.enabled }} apiVersion: v1 kind: PersistentVolumeClaim metadata: name: {{ printf "%s-mysql-pvc" .Release.Name | quote }} labels: {{- include "mysql.labels" . | nindent 4 }} spec: accessModes: ["ReadWriteOnce"] {{- if .Values.persistence.storageClass }} storageClassName: {{ .Values.persistence.storageClass | quote }} {{- end }} resources: requests: storage: {{ .Values.persistence.size }} {{- end }}
+
+
+---
+
+charts/mysql/templates/deployment.yaml
+
+apiVersion: apps/v1 kind: Deployment metadata: name: {{ include "mysql.fullname" . }} labels: {{- include "mysql.labels" . | nindent 4 }} spec: replicas: 1 selector: matchLabels: app.kubernetes.io/name: mysql app.kubernetes.io/instance: {{ .Release.Name }} template: metadata: labels: app.kubernetes.io/name: mysql app.kubernetes.io/instance: {{ .Release.Name }} spec: containers: - name: mysql image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}" imagePullPolicy: {{ .Values.image.pullPolicy }} ports: - containerPort: 3306 name: mysql env: - name: MYSQL_ROOT_PASSWORD valueFrom: secretKeyRef: name: {{ printf "%s-mysql-secret" .Release.Name | quote }} key: root-password - name: MYSQL_DATABASE value: {{ .Values.mysqlDatabase | quote }} - name: MYSQL_USER valueFrom: secretKeyRef: name: {{ printf "%s-mysql-secret" .Release.Name | quote }} key: username - name: MYSQL_PASSWORD valueFrom: secretKeyRef: name: {{ printf "%s-mysql-secret" .Release.Name | quote }} key: password readinessProbe: tcpSocket: port: 3306 initialDelaySeconds: 10 periodSeconds: 5 livenessProbe: tcpSocket: port: 3306 initialDelaySeconds: 30 periodSeconds: 10 volumeMounts: - name: mysql-data mountPath: /var/lib/mysql volumes: - name: mysql-data {{- if .Values.persistence.enabled }} persistentVolumeClaim: claimName: {{ printf "%s-mysql-pvc" .Release.Name | quote }} {{- else }} emptyDir: {} {{- end }}
+
+
+---
+
+charts/mysql/templates/service.yaml
+
+apiVersion: v1 kind: Service metadata: name: {{ include "mysql.fullname" . }} labels: {{- include "mysql.labels" . | nindent 4 }} spec: type: ClusterIP ports: - port: {{ .Values.service.port }} targetPort: 3306 protocol: TCP name: mysql selector: app.kubernetes.io/name: mysql app.kubernetes.io/instance: {{ .Release.Name }}
+
+
+---
+
+charts/mysql/templates/NOTES.txt
+
+MySQL has been deployed as part of the release.
+
+Service name: {{ include "mysql.fullname" . }}
+
+To connect from inside the cluster, use: mysql -h {{ include "mysql.fullname" . }} -u {{ .Values.mysqlUser }} -p
+
+-------------------------
+
+HOW TO INSTALL / UPGRADE
+
+-------------------------
+
+From the springboot-app/ directory, run:
+
+
+
+helm dependency build    # optional; not required for file:// subcharts but good practice
+
+helm install my-release . --wait --timeout 5m
+
+
+
+To override secrets safely, prefer a separate file (e.g., prod-values.yaml):
+
+
+
+mysql:
+
+mysqlRootPassword: "${MYSQL_ROOT_PASSWORD}"
+
+mysqlPassword: "${APP_DB_PASSWORD}"
+
+
+
+Then:
+
+helm upgrade --install my-release . -f prod-values.yaml --wait --timeout 5m
+
