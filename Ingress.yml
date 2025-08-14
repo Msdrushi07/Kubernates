@@ -23,3 +23,56 @@ spec:
                 name: department-service
                 port:
                   number: 8082
+
+if want to use it in helm
+values.yml
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: company.local
+      paths:
+        - path: /employee
+          pathType: Prefix
+          service:
+            name: employee-service
+            port: 8080
+        - path: /department
+          pathType: Prefix
+          service:
+            name: department-service
+            port: 8080
+
+create template/ingress.yml
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "mychart.fullname" . }}-ingress
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+spec:
+  rules:
+  {{- range .Values.ingress.hosts }}
+    - host: {{ .host }}
+      http:
+        paths:
+        {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ .service.name }}
+                port:
+                  number: {{ .service.port }}
+        {{- end }}
+  {{- end }}
+{{- end }}
+
+helm install my-release ./spring-app
+
+What changes from plain YAML
+Instead of hardcoding service names, ports, and hosts, you parameterize them in values.yaml.
+You can deploy different environments (dev, stage, prod) by just changing the values file.
+Ingress is created only if ingress.enabled is true.
+Paths and services can be added/removed without touching templates/ingress.yaml.
