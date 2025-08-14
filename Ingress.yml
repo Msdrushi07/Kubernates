@@ -13,9 +13,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: employee-service
+                name: employee-service # must match service name metadata.name
                 port:
-                  number: 8081
+                  number: 8081  # must match the Service’s port (Port filed), not the container port.
           - path: /department
             pathType: Prefix
             backend:
