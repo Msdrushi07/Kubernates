@@ -23,13 +23,13 @@ spec:
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 configMapKeyRef:
-                  name: mysql-config
-                  key: mysql-user
+                  name: mysql-config  // name of config map meta data
+                  key: mysql-user    // data as a key specified in config map
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
-                  key: mysql-password
+                  name: mysql-secret   // name of secret map meta data
+                  key: mysql-password  // data as a key specified in secret map
 ---
 apiVersion: v1
 kind: Service
